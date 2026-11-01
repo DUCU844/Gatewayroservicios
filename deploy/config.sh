@@ -13,5 +13,7 @@ FUNCTIONS=(
   "$FN_PREFIX-create-direct=edu.eci.arem.orders.lambda.direct.CreateOrderHandler::handleRequest"
   "$FN_PREFIX-get-direct=edu.eci.arem.orders.lambda.direct.GetOrderHandler::handleRequest"
   "$FN_PREFIX-find-direct=edu.eci.arem.orders.lambda.direct.FindOrdersByCustomerHandler::handleRequest"
+  "$FN_PREFIX-proxy=edu.eci.arem.orders.lambda.proxy.ApiGatewayProxyHandler::handleRequest"
 )
 MAPPING_FUNCTIONS=("$FN_PREFIX-create-direct" "$FN_PREFIX-get-direct" "$FN_PREFIX-find-direct")
+PROXY_FUNCTIONS=("$FN_PREFIX-proxy")

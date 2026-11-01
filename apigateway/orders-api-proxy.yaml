@@ -1,0 +1,50 @@
+# Architecture B - API Gateway REST API with Lambda PROXY integration.
+#
+# API Gateway only routes the request and forwards the whole HTTP request as an event to ONE Lambda.
+# Parameter extraction, validation-to-HTTP mapping, status codes and headers live in ApiGatewayProxyHandler.
+#
+# ${REGION}, ${ACCOUNT_ID} and ${FN_PREFIX} are replaced by deploy/deploy.sh before importing.
+swagger: "2.0"
+info:
+  title: orders-api-proxy
+  description: Orders API - Architecture B (Lambda proxy integration + Java HTTP adapter)
+  version: "1.0"
+schemes:
+  - https
+produces:
+  - application/json
+
+x-amazon-apigateway-gateway-responses:
+  MISSING_AUTHENTICATION_TOKEN:
+    statusCode: 404
+    responseTemplates:
+      application/json: '{"error":"ROUTE_NOT_FOUND","message":"No route for $context.httpMethod $context.path"}'
+  DEFAULT_5XX:
+    responseTemplates:
+      application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'
+
+paths:
+  /orders:
+    get:
+      parameters:
+        - { name: customerId, in: query, required: false, type: string }
+      responses: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-proxy/invocations
+    post:
+      responses: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-proxy/invocations
+  /orders/{id}:
+    get:
+      parameters:
+        - { name: id, in: path, required: true, type: string }
+      responses: {}
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-proxy/invocations
