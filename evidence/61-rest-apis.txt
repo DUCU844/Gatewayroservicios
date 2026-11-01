@@ -1,0 +1,23 @@
+# Deployed API Gateway REST APIs, resources and methods
+# 2026-11-01 11:41:47 -0500
+$ aws apigateway get-rest-apis --query "items[?starts_with(name, 'orders-api')].[name,id]" --output table; for id in 53zqfs5myi qdkefe66a7; do echo $id; aws apigateway get-resources --rest-api-id $id --query "items[?resourceMethods].[path, join(',', keys(resourceMethods))]" --output table; done
+--------------------------------------
+|             GetRestApis            |
++---------------------+--------------+
+|  orders-api-mapping |  53zqfs5myi  |
+|  orders-api-proxy   |  qdkefe66a7  |
++---------------------+--------------+
+53zqfs5myi
+--------------------------------
+|         GetResources         |
++---------------+--------------+
+|  /orders/{id} |  DELETE,GET  |
+|  /orders      |  GET,POST    |
++---------------+--------------+
+qdkefe66a7
+--------------------------------
+|         GetResources         |
++---------------+--------------+
+|  /orders      |  GET,POST    |
+|  /orders/{id} |  DELETE,GET  |
++---------------+--------------+

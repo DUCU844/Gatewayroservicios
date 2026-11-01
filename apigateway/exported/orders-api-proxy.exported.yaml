@@ -1,0 +1,62 @@
+---
+swagger: "2.0"
+info:
+  description: "Orders API - Architecture B (Lambda proxy integration + Java HTTP\
+    \ adapter)"
+  version: "1.0"
+  title: "orders-api-proxy"
+host: "qdkefe66a7.execute-api.us-east-1.amazonaws.com"
+basePath: "/prod"
+schemes:
+- "https"
+paths:
+  /orders:
+    get:
+      parameters:
+      - name: "customerId"
+        in: "query"
+        required: false
+        type: "string"
+      responses: {}
+      x-amazon-apigateway-integration:
+        uri: "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:416384710474:function:orders-proxy/invocations"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+        responseTransferMode: "BUFFERED"
+        type: "aws_proxy"
+    post:
+      responses: {}
+      x-amazon-apigateway-integration:
+        uri: "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:416384710474:function:orders-proxy/invocations"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+        responseTransferMode: "BUFFERED"
+        type: "aws_proxy"
+  /orders/{id}:
+    get:
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+      responses: {}
+      x-amazon-apigateway-integration:
+        uri: "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:416384710474:function:orders-proxy/invocations"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+        responseTransferMode: "BUFFERED"
+        type: "aws_proxy"
+    delete:
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+      responses: {}
+      x-amazon-apigateway-integration:
+        uri: "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:416384710474:function:orders-proxy/invocations"
+        httpMethod: "POST"
+        passthroughBehavior: "when_no_match"
+        responseTransferMode: "BUFFERED"
+        type: "aws_proxy"
+x-amazon-apigateway-security-policy: "TLS_1_0"

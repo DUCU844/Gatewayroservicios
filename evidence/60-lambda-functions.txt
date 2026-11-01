@@ -1,0 +1,12 @@
+# Deployed Lambda functions
+# 2026-11-01 11:41:45 -0500
+$ aws lambda list-functions --query "Functions[?starts_with(FunctionName, 'orders-')].[FunctionName,Runtime,Handler,MemorySize]" --output table
+---------------------------------------------------------------------------------------------------------------------------
+|                                                      ListFunctions                                                      |
++----------------------+---------+--------------------------------------------------------------------------------+-------+
+|  orders-get-direct   |  java17 |  edu.eci.arem.orders.lambda.direct.GetOrderHandler::handleRequest              |  512  |
+|  orders-find-direct  |  java17 |  edu.eci.arem.orders.lambda.direct.FindOrdersByCustomerHandler::handleRequest  |  512  |
+|  orders-create-direct|  java17 |  edu.eci.arem.orders.lambda.direct.CreateOrderHandler::handleRequest           |  512  |
+|  orders-delete-direct|  java17 |  edu.eci.arem.orders.lambda.direct.DeleteOrderHandler::handleRequest           |  512  |
+|  orders-proxy        |  java17 |  edu.eci.arem.orders.lambda.proxy.ApiGatewayProxyHandler::handleRequest        |  512  |
++----------------------+---------+--------------------------------------------------------------------------------+-------+
