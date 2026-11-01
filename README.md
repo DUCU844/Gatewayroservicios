@@ -152,6 +152,157 @@ List<Order> getOrdersByCustomer(String customerId);
 
 ---
 
+## 3. Part II — A Java function on AWS Lambda
+
+The same JAR (`target/orders-api-1.0.0.jar`, shaded) is uploaded to every function; only the handler string
+changes. Nothing in `OrderService` was redesigned for Lambda — the handlers are 3-line delegations.
+
+| Function               | Handler                                                                    |
+|------------------------|----------------------------------------------------------------------------|
+| `orders-create-direct` | `edu.eci.arem.orders.lambda.direct.CreateOrderHandler::handleRequest`        |
+| `orders-get-direct`    | `edu.eci.arem.orders.lambda.direct.GetOrderHandler::handleRequest`           |
+| `orders-find-direct`   | `edu.eci.arem.orders.lambda.direct.FindOrdersByCustomerHandler::handleRequest` |
+| `orders-delete-direct` | `edu.eci.arem.orders.lambda.direct.DeleteOrderHandler::handleRequest`        |
+| `orders-proxy`         | `edu.eci.arem.orders.lambda.proxy.ApiGatewayProxyHandler::handleRequest`     |
+
+Runtime `java17`, 512 MB, 15 s timeout ([screenshot](evidence/screenshots/60-lambda-functions.png)).
+
+Manual invocation (payloads in [`events/direct/`](events/direct)):
+
+```bash
+aws lambda invoke --function-name orders-create-direct --cli-binary-format raw-in-base64-out \
+  --payload file://events/direct/create-order-1.json out.json && cat out.json
+```
+
+| Input | Result | Evidence |
+|-------|--------|----------|
+| `{"customerId":"CUST-42","product":"MacBook Air","quantity":1}` | `{"id":"ORD-43","customerId":"CUST-42","product":"MacBook Air","quantity":1}` | [11](evidence/screenshots/11-lambda-create-1.png) |
+| `{"customerId":"CUST-100","product":"Mechanical Keyboard","quantity":3}` | `{"id":"ORD-44",...}` | [12](evidence/screenshots/12-lambda-create-2.png) |
+| `{... "quantity":0}` | `FunctionError: Unhandled`, `{"errorMessage":"INVALID_ORDER: quantity must be at least 1","errorType":"...InvalidOrderException","stackTrace":[...]}` | [13](evidence/screenshots/13-lambda-create-invalid.png) |
+| `{"id":"ORD-42"}` → get | `{"id":"ORD-42","customerId":"CUST-7","product":"Keyboard","quantity":2}` | [14](evidence/screenshots/14-lambda-get.png) |
+| `{"id":"ORD-999"}` → get | `errorMessage: "ORDER_NOT_FOUND: Order ORD-999 does not exist"` | [15](evidence/screenshots/15-lambda-get-missing.png) |
+| `{"customerId":"CUST-42"}` → find | JSON **array** of 2 orders (`List<Order>`) | [16](evidence/screenshots/16-lambda-find.png) |
+
+### Investigation — how does Lambda turn JSON into Java objects and back?
+
+What the LLM explained, and what I then checked against the deployed function:
+
+1. The Java managed runtime polls the Lambda **Runtime API** (`/runtime/invocation/next`) and receives the event
+   as raw bytes (JSON).
+2. It loads the handler class from the handler string and reads, **by reflection**, the generic types of
+   `RequestHandler<I, O>` (here `I = CreateOrderRequest`, `O = Order`).
+3. It deserializes the bytes into `I` with its own serialization library (`aws-lambda-java-serialization`, a
+   shaded, pre-configured Jackson). The target must be a JavaBean: public no-arg constructor + setters.
+   For classes from `aws-lambda-java-events` it uses special mix-ins.
+4. It calls `handleRequest(input, context)` and serializes the return value `O` with the same library
+   (getters → JSON properties; `List` → JSON array; `null`/`Void` → `null`).
+5. If the handler throws, the runtime reports an error whose body is
+   `{"errorMessage": e.getMessage(), "errorType": <class>, "stackTrace": [...]}` and the invoke response
+   carries `FunctionError: Unhandled`. The invoke itself is still HTTP 200.
+6. `RequestStreamHandler` is the alternative to opt out of this and receive the raw `InputStream`.
+
+Experiments on the deployed function to verify it:
+
+| Experiment | Observed | Conclusion | Evidence |
+|------------|----------|------------|----------|
+| Extra field `"color"`, client-supplied `"id":"HACKED-1"`, `"quantity":"2"` (string) | 200, `{"id":"ORD-45",...,"quantity":2}` | Unknown properties are **ignored**; the client cannot set the id (`CreateOrderRequest` has no `id`); the string `"2"` was **coerced** to `Integer` | [17](evidence/screenshots/17-lambda-extra-fields.png) |
+| `"CustomerID"`, `"PRODUCT"` | `INVALID_ORDER: customerId is required` | Property matching is **case-sensitive**, by JavaBean name | [18](evidence/screenshots/18-lambda-case.png) |
+| Payload `"just a string"` | `errorType: java.lang.RuntimeException`, `"An error occurred during JSON parsing"`, empty stack trace | Deserialization fails **before** our code runs; we cannot customize that error | [19](evidence/screenshots/19-lambda-not-object.png) |
+| Handler throws a domain exception | `errorMessage` = `getMessage()` exactly | This is the string API Gateway (Architecture A) matches with its regex | [13](evidence/screenshots/13-lambda-create-invalid.png), [15](evidence/screenshots/15-lambda-get-missing.png) |
+
+**Conclusion.** The runtime does the JSON ⇄ Java mapping for us, driven by the generic types of the handler, with
+lenient defaults (unknown properties ignored, scalars coerced) but case-sensitive names. Because of that, Lambda
+input/output types have to be plain JavaBeans — this is why `Order` and `CreateOrderRequest` are classes with
+setters and not records.
+
+### Checkpoint 2 — the actual solution
+
+```mermaid
+flowchart LR
+    CLI["aws lambda invoke<br/>--payload create-order-1.json"] -- "JSON bytes" --> RT
+    subgraph Lambda["AWS Lambda — orders-create-direct (java17)"]
+        RT["Java runtime<br/>(aws-lambda-java-serialization)"] -- "CreateOrderRequest" --> H["CreateOrderHandler<br/>RequestHandler&lt;CreateOrderRequest, Order&gt;"]
+        H -- "createOrder(request)" --> S["OrderService<br/>(plain Java)"]
+        S --> R[("InMemoryOrderRepository")]
+        S -- "Order / InvalidOrderException" --> H
+        H -- "Order" --> RT
+    end
+    RT -- "JSON: order or {errorMessage, errorType}" --> CLI
+```
+
+---
+
+## 4. Part III & IV — Architecture A: API Gateway mapping templates (non-proxy)
+
+Definition: [`apigateway/orders-api-mapping.yaml`](apigateway/orders-api-mapping.yaml) (OpenAPI 2 +
+`x-amazon-apigateway-*` extensions, imported by `deploy/deploy.sh`). What is actually deployed was exported to
+[`apigateway/exported/`](apigateway/exported).
+
+```
+Base URL: https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod
+```
+
+### Request mapping — API Gateway builds the exact JSON each Java function expects
+
+| Route | Integration request template | Lambda receives |
+|-------|------------------------------|-----------------|
+| `GET /orders/{id}` | `{"id": "$util.escapeJavaScript($input.params('id'))"}` | `{"id":"ORD-42"}` → `OrderIdInput` |
+| `GET /orders?customerId=` | `{"customerId": "$util.escapeJavaScript($input.params('customerId'))"}` | `{"customerId":"CUST-42"}` → `CustomerQueryInput` |
+| `POST /orders` | `$input.json('$')` (body as is) | `CreateOrderRequest` |
+| `DELETE /orders/{id}` | same as GET by id | `OrderIdInput` |
+
+Proof with `test-invoke-method` — the Java function never sees the HTTP request, only `{"id": "ORD-42"}`
+([screenshot 20](evidence/screenshots/20-mapping-test-invoke.png)):
+
+```
+Method request path: {id=ORD-42}
+Endpoint request body after transformations: {
+  "id": "ORD-42"
+}
+Endpoint response body before transformations: {"id":"ORD-42","customerId":"CUST-7","product":"Keyboard","quantity":2}
+```
+
+### Response mapping — API Gateway chooses the status code
+
+The Lambda either returns normally or fails with `errorMessage = "<CODE>: <description>"`.
+Integration responses match that message with a regex and rewrite the body into our error format:
+
+| Selection pattern (regex on `errorMessage`) | Status | Body template |
+|---------------------------------------------|--------|---------------|
+| *(default — success)* | 200 (`POST`: **201** + `Location` via `$context.responseOverride.header.Location`; `DELETE`: **204** with empty template) | Lambda output |
+| `(?s)ORDER_NOT_FOUND:.*` | 404 | `{"error":"ORDER_NOT_FOUND","message":"<text after the code>"}` |
+| `(?s)(INVALID_ORDER\|MISSING_CUSTOMER_ID):.*` | 400 | `{"error":"<code>","message":"<text>"}` |
+| `(?s)(?!INVALID_ORDER:\|MISSING_CUSTOMER_ID:\|ORDER_NOT_FOUND:).+` | 500 | `{"error":"INTERNAL_ERROR","message":"Unexpected error"}` (stack trace never leaves AWS) |
+
+API Gateway also has its own **request validator** on `POST` (JSON Schema with types only) and **gateway
+responses** (`BAD_REQUEST_BODY`, `MISSING_AUTHENTICATION_TOKEN` → 404 `ROUTE_NOT_FOUND`, `DEFAULT_5XX`), so
+errors produced before Lambda runs use the same error format.
+
+### Tests from an HTTP client (curl)
+
+| Request | Status | Evidence |
+|---------|--------|----------|
+| `GET /orders/ORD-42` | **200** order | [21](evidence/screenshots/21-mapping-get-200.png) |
+| `GET /orders/ORD-999` | **404** `ORDER_NOT_FOUND` | [22](evidence/screenshots/22-mapping-get-404.png) |
+| `GET /orders?customerId=CUST-42` | **200** array with 2 orders | [23](evidence/screenshots/23-mapping-query-cust42.png) |
+| `GET /orders?customerId=CUST-100` | **200** `[]` | [24](evidence/screenshots/24-mapping-query-cust100.png) |
+| `GET /orders` | **400** `MISSING_CUSTOMER_ID` | [25](evidence/screenshots/25-mapping-query-400.png) |
+| `POST /orders` valid | **201** + `Location: /orders/ORD-46` | [26](evidence/screenshots/26-mapping-post-201.png) |
+| `POST /orders` `quantity: 0` | **400** `INVALID_ORDER` (rule in Java) | [27](evidence/screenshots/27-mapping-post-400.png) |
+| `POST /orders` `quantity: "one"` | **400** (API Gateway validator; Lambda not invoked) | [28](evidence/screenshots/28-mapping-post-malformed.png) |
+| `GET /orders/ORD-46` (just created) | **404** ⚠️ see below | [29](evidence/screenshots/29-mapping-get-created.png) |
+| `DELETE /orders/ORD-42` | **204** | [30](evidence/screenshots/30-mapping-delete-204.png) |
+| `DELETE /orders/ORD-999` | **404** | [31](evidence/screenshots/31-mapping-delete-404.png) |
+| `GET /customers` | **404** `ROUTE_NOT_FOUND` (gateway response) | [32](evidence/screenshots/32-mapping-unknown-route.png) |
+
+⚠️ **Finding:** the order created by `POST` (in `orders-create-direct`) is **not** found by `GET`
+(`orders-get-direct`). Each function has its own execution environment and therefore its own in-memory
+repository. One-function-per-operation makes it obvious that in-memory data is not shared state — a real
+system needs external storage such as DynamoDB. (The id is `ORD-46` and not `ORD-43` because the same warm
+environment had already handled the manual invocations of Part II.)
+
+---
+
 ## 9. Final challenge — `DELETE /orders/{id}`
 
 ### Prediction (written and committed *before* implementing the feature)
@@ -177,3 +328,4 @@ List<Order> getOrdersByCustomer(String customerId);
    nor listed for its customer; delete a missing order throws; deleting twice → second time throws.
    Adapter: `DELETE` existing → 204 with empty body; `DELETE` missing → 404 with the error body.
    Direct handler: delegates and propagates the `ORDER_NOT_FOUND:` message.
+
