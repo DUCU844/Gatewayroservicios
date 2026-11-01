@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Exercises the HTTP adapter locally with hand-built API Gateway proxy events: no AWS needed. */
 class ApiGatewayProxyHandlerTest {
@@ -117,6 +118,27 @@ class ApiGatewayProxyHandlerTest {
 
         assertEquals(400, response.getStatusCode());
         assertEquals("MISSING_CUSTOMER_ID", json(response).get("error").asText());
+    }
+
+    @Test
+    void deleteExistingOrderIs204WithEmptyBody() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                event("DELETE", "/orders/{id}", "/orders/ORD-42").withPathParameters(Map.of("id", "ORD-42")), null);
+
+        assertEquals(204, response.getStatusCode());
+        assertNull(response.getBody());
+        assertEquals(404, handler.handleRequest(
+                event("GET", "/orders/{id}", "/orders/ORD-42").withPathParameters(Map.of("id", "ORD-42")), null)
+                .getStatusCode());
+    }
+
+    @Test
+    void deleteMissingOrderIs404() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                event("DELETE", "/orders/{id}", "/orders/ORD-999").withPathParameters(Map.of("id", "ORD-999")), null);
+
+        assertEquals(404, response.getStatusCode());
+        assertEquals("ORDER_NOT_FOUND", json(response).get("error").asText());
     }
 
     @Test

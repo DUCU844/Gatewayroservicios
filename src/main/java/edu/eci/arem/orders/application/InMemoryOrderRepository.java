@@ -59,6 +59,11 @@ public class InMemoryOrderRepository implements OrderRepository {
         return result;
     }
 
+    @Override
+    public boolean deleteById(String id) {
+        return orders.remove(id) != null;
+    }
+
     // Defensive copies: callers (and the serializer) must not mutate stored state.
     private static Order copy(Order o) {
         return new Order(o.getId(), o.getCustomerId(), o.getProduct(), o.getQuantity());

@@ -123,6 +123,28 @@ class OrderServiceTest {
     }
 
     @Test
+    void deletesExistingOrder() {
+        service.deleteOrder("ORD-42");
+
+        assertThrows(OrderNotFoundException.class, () -> service.getOrder("ORD-42"));
+        assertTrue(service.getOrdersByCustomer("CUST-7").isEmpty());
+    }
+
+    @Test
+    void deletingMissingOrderFails() {
+        OrderNotFoundException ex = assertThrows(OrderNotFoundException.class, () -> service.deleteOrder("ORD-999"));
+
+        assertEquals("ORD-999", ex.getOrderId());
+    }
+
+    @Test
+    void deletingTwiceFailsTheSecondTime() {
+        service.deleteOrder("ORD-001");
+
+        assertThrows(OrderNotFoundException.class, () -> service.deleteOrder("ORD-001"));
+    }
+
+    @Test
     void invalidOrderIsNotStored() {
         assertThrows(InvalidOrderException.class,
                 () -> service.createOrder(new CreateOrderRequest("CUST-55", "Phone", -1)));

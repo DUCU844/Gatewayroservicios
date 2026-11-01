@@ -181,3 +181,42 @@ paths:
             statusCode: "500"
             responseTemplates:
               application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'
+
+    delete:
+      summary: Delete an order
+      parameters:
+        - { name: id, in: path, required: true, type: string }
+      responses:
+        "204": { description: Order deleted }
+        "404": { description: Order not found, schema: { $ref: "#/definitions/Error" } }
+        "500": { description: Unexpected error, schema: { $ref: "#/definitions/Error" } }
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-delete-direct/invocations
+        passthroughBehavior: when_no_templates
+        requestTemplates:
+          application/json: |
+            {
+              "id": "$util.escapeJavaScript($input.params('id'))"
+            }
+        responses:
+          default:
+            statusCode: "204"
+            responseTemplates:
+              # The Lambda returns null; this template renders nothing, so the 204 has an empty body.
+              application/json: "#set($noBody = '')"
+          "(?s)ORDER_NOT_FOUND:.*":
+            statusCode: "404"
+            responseTemplates:
+              application/json: |
+                #set($raw = $input.path('$.errorMessage'))
+                #set($start = $raw.indexOf(':') + 2)
+                {
+                  "error": "ORDER_NOT_FOUND",
+                  "message": "$util.escapeJavaScript($raw.substring($start))"
+                }
+          "(?s)(?!INVALID_ORDER:|MISSING_CUSTOMER_ID:|ORDER_NOT_FOUND:).+":
+            statusCode: "500"
+            responseTemplates:
+              application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'

@@ -45,6 +45,21 @@ class DirectHandlersTest {
     }
 
     @Test
+    void deleteHandlerRemovesOrder() {
+        new DeleteOrderHandler(service).handleRequest(new OrderIdInput("ORD-42"), null);
+
+        assertThrows(OrderNotFoundException.class, () -> service.getOrder("ORD-42"));
+    }
+
+    @Test
+    void deleteHandlerErrorMessageMatchesGatewayRegex() {
+        OrderNotFoundException ex = assertThrows(OrderNotFoundException.class,
+                () -> new DeleteOrderHandler(service).handleRequest(new OrderIdInput("ORD-999"), null));
+
+        assertTrue(ex.getMessage().matches("(?s)ORDER_NOT_FOUND:.*"));
+    }
+
+    @Test
     void findHandlerFiltersByCustomer() {
         assertEquals(2, new FindOrdersByCustomerHandler(service)
                 .handleRequest(new CustomerQueryInput("CUST-42"), null).size());
