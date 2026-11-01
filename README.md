@@ -303,6 +303,129 @@ environment had already handled the manual invocations of Part II.)
 
 ---
 
+## 5. HTTP semantics and Checkpoint 3
+
+| Outcome | Status | Who decides in Architecture A |
+|---------|--------|-------------------------------|
+| Successful retrieval | 200 | default integration response |
+| Successful creation | 201 + `Location` | default integration response of `POST` + response template |
+| Deleted | 204 | default integration response of `DELETE` |
+| Invalid input | 400 | regex on `INVALID_ORDER:` / `MISSING_CUSTOMER_ID:`, or the request validator |
+| Not found | 404 | regex on `ORDER_NOT_FOUND:` |
+| Unexpected | 500 | negative-lookahead regex / `DEFAULT_5XX` |
+
+**What API Gateway is responsible for in Architecture A:** routing (resource + method); extracting the path
+parameter `{id}`; extracting the query parameter `customerId`; transforming requests (VTL templates); validating
+body types (JSON Schema); transforming responses (errors to `{error, message}`, empty body for 204); choosing
+status codes (regex over `errorMessage`); adding the `Location` header; formatting its own errors (gateway
+responses).
+
+**Advantages**
+- The Java functions are almost pure: they receive `{"id": ...}` and return an `Order`. No HTTP classes.
+- The contract (methods, statuses, schemas, headers) is declared in one file and can be exported/documented.
+- Some invalid requests are rejected before paying for a Lambda invocation (validator, unknown routes).
+
+**Disadvantages**
+- Logic spread over 2 places and 2 languages (Java + VTL + regex). Status codes depend on a **string
+  convention** (`"ORDER_NOT_FOUND: ..."`) between the exception message and a regex — rename the prefix and you
+  silently get a 200/500.
+- VTL templates cannot be unit-tested locally; the only feedback loop is deploying and calling (or
+  `test-invoke-method`). Each new operation repeats the same 3–4 response mappings.
+- The domain exceptions had to adopt a message format dictated by the integration layer, which is a leak of
+  infrastructure into the domain.
+- Hard to read for someone who does not know API Gateway; vendor lock-in of the HTTP layer.
+
+---
+
+## 6. Part V — Lambda proxy integration: the event
+
+With `type: aws_proxy` API Gateway does no transformation and sends the whole HTTP request to the function.
+Real event captured with `test-invoke-method` (credentials redacted):
+[`events/proxy/api-gateway-proxy-event.json`](events/proxy/api-gateway-proxy-event.json)
+([screenshot 40](evidence/screenshots/40-proxy-event.png)).
+
+| Information | Where it appears in the event | Java accessor (`APIGatewayProxyRequestEvent`) |
+|-------------|-------------------------------|-----------------------------------------------|
+| HTTP method | `httpMethod` (also `requestContext.httpMethod`) | `getHttpMethod()` |
+| Path | `path` (actual) and `resource` (template, e.g. `/orders/{id}`) | `getPath()`, `getResource()` |
+| Path parameters | `pathParameters` → `{"id": "ORD-42"}` (or `null`) | `getPathParameters()` |
+| Query parameters | `queryStringParameters` / `multiValueQueryStringParameters` | `getQueryStringParameters()` |
+| Headers | `headers` / `multiValueHeaders` | `getHeaders()` |
+| Request body | `body` — always a **string** (or `null`), Base64 if `isBase64Encoded` | `getBody()`, `getIsBase64Encoded()` |
+
+The function must answer with `{"statusCode": ..., "headers": {...}, "body": "<string>"}`
+(`APIGatewayProxyResponseEvent`). API Gateway forwards that as the HTTP response.
+
+---
+
+## 7. Part V — the HTTP adapter (Architecture B)
+
+```
+Base URL: https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod
+```
+
+[`ApiGatewayProxyHandler`](src/main/java/edu/eci/arem/orders/lambda/proxy/ApiGatewayProxyHandler.java) is the
+only class that knows about API Gateway, headers and status codes. It:
+
+1. routes on `httpMethod + resource` (`"GET /orders/{id}"`, ...);
+2. extracts `pathParameters.id`, `queryStringParameters.customerId`, and the body (decoding Base64 and parsing
+   JSON with Jackson);
+3. calls `OrderService` — which still deals only with `Order`, `customerId`, `product`, `quantity`;
+4. translates the outcome: return value → 200/201/204, `InvalidOrderException` or bad JSON → 400,
+   `OrderNotFoundException` → 404, unknown route → 404, any other `RuntimeException` → 500 with a generic body
+   (the detail goes to CloudWatch logs only). `HttpResponses` builds the response objects.
+
+A `Location: /orders/{id}` header is returned on 201: it is the URI of the new resource, which is what
+RFC 9110 says a 201 should identify, and it lets a client follow it without knowing how URLs are built.
+
+Since the adapter is a plain class, it is tested locally with hand-built events
+(`ApiGatewayProxyHandlerTest`, 14 tests, no AWS).
+
+| Request | Status | Evidence |
+|---------|--------|----------|
+| `POST /orders` | **201** + `Location: /orders/ORD-43` | [41](evidence/screenshots/41-proxy-post-201.png) |
+| `GET /orders/ORD-43` (just created) | **200** — same function, same warm environment | [42](evidence/screenshots/42-proxy-get-created.png) |
+| `GET /orders/ORD-42` | **200** | [43](evidence/screenshots/43-proxy-get-200.png) |
+| `GET /orders/ORD-999` | **404** `ORDER_NOT_FOUND` | [44](evidence/screenshots/44-proxy-get-404.png) |
+| `GET /orders?customerId=CUST-42` | **200** (includes ORD-43) | [45](evidence/screenshots/45-proxy-query-cust42.png) |
+| `GET /orders?customerId=CUST-100` | **200** `[]` | [46](evidence/screenshots/46-proxy-query-cust100.png) |
+| `GET /orders` | **400** `MISSING_CUSTOMER_ID` | [47](evidence/screenshots/47-proxy-query-400.png) |
+| `POST /orders` `quantity: 0` | **400** `INVALID_ORDER` | [48](evidence/screenshots/48-proxy-post-400.png) |
+| `POST /orders` `{not json` | **400** `INVALID_ORDER` (adapter) | [49](evidence/screenshots/49-proxy-post-malformed.png) |
+| `DELETE /orders/ORD-42` | **204** | [50](evidence/screenshots/50-proxy-delete-204.png) |
+| `GET` then `DELETE /orders/ORD-42` again | **404**, **404** | [51](evidence/screenshots/51-proxy-delete-again.png) |
+| `GET /customers` | **404** `ROUTE_NOT_FOUND` | [52](evidence/screenshots/52-proxy-unknown-route.png) |
+
+---
+
+## 8. Comparing the two architectures
+
+1. **More API Gateway configuration?** A, by far: `orders-api-mapping.yaml` has request templates, 3–4
+   integration responses per method with regexes and VTL, a validator and a model. B's file only lists
+   routes pointing to one function.
+2. **More Java infrastructure code?** B: `ApiGatewayProxyHandler` + `HttpResponses` (routing, parameter
+   extraction, JSON, status codes, ~150 lines). A's handlers are 3-line delegations plus two input DTOs.
+3. **Easier to test locally?** B. The whole HTTP behaviour (status codes, headers, error bodies) is covered by
+   JUnit. In A the status-code logic lives in VTL/regex and can only be verified after deploying.
+4. **Where are status codes defined?** A: in API Gateway integration responses (regex over `errorMessage`)
+   and gateway responses. B: in Java, in `ApiGatewayProxyHandler.handleRequest`.
+5. **From 3 to 30 operations?** A: 30 methods × (request template + ~4 response mappings), ~30 functions, all
+   copy-pasted VTL, and every new error code means touching the regexes of every method. B: 30 cases in a
+   router; at that size the hand-written `switch` should become a small routing table or a lightweight
+   framework, and one big function may need splitting by bounded context (cold start, permissions, blast
+   radius). B scales better in effort; A gives finer per-operation control.
+6. **Cleaner Java business logic?** Equally clean `OrderService` in both — that was the point of keeping it
+   independent. But A forced a format on exception messages; B leaves the domain completely free.
+7. **Easier for another developer?** B: everything is in Java, visible in one class, debuggable and testable.
+   A requires knowing API Gateway's VTL, selection patterns and where to look in the console.
+8. **For a larger system?** B (proxy + thin adapter), with the business logic still isolated behind it. The
+   HTTP contract becomes code that is reviewed, versioned and tested like the rest. I would still use API
+   Gateway for what it is good at — routing, authentication, throttling, request size limits, CORS — and
+   would keep the OpenAPI document as the published contract. A remains interesting when the integration
+   target is not your own code (e.g. API Gateway → DynamoDB or SQS directly, with no Lambda at all).
+
+---
+
 ## 9. Final challenge — `DELETE /orders/{id}`
 
 ### Prediction (written and committed *before* implementing the feature)
