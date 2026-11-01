@@ -452,3 +452,215 @@ Since the adapter is a plain class, it is tested locally with hand-built events
    Adapter: `DELETE` existing → 204 with empty body; `DELETE` missing → 404 with the error body.
    Direct handler: delegates and propagates the `ORDER_NOT_FOUND:` message.
 
+### What actually happened vs. the prediction
+
+| Question | Prediction | What the agent proposed / what was implemented | Match |
+|----------|------------|-----------------------------------------------|-------|
+| Classes that change | Repository, `InMemoryOrderRepository`, `OrderService`, proxy handler, new `DeleteOrderHandler` | Exactly those (+ tests). `Order` and exceptions unchanged | ✅ |
+| New Lambda | B no, A yes | `orders-proxy` reused; `orders-delete-direct` added | ✅ |
+| API Gateway changes | Both | A: new `delete` method with request template and 204/404/500 responses. B: one `delete` method → same function | ✅ |
+| Deletion logic | `OrderService.deleteOrder` | `repository.deleteById` returns `boolean`; the service throws `OrderNotFoundException` when it is `false` | ✅ |
+| 204 vs 404 | A: gateway, B: adapter | Same. A needed an empty response template (`#set($noBody = '')`) because the `Void` handler returns `null` and the passthrough body would have been the text `null` | ✅ (detail not predicted) |
+| Tests | service + adapter + handler | 3 service tests, 2 adapter tests, 2 direct-handler tests | ✅ |
+
+Not predicted: API Gateway adds `Content-Type: application/json` to the 204 response even though the adapter
+sends no headers and no body (seen in [50](evidence/screenshots/50-proxy-delete-204.png)). It is harmless. A
+second `DELETE` of the same id returns 404, so `DELETE` is idempotent in its effect on the server, not in its
+status code — this is allowed by HTTP.
+
+---
+
+## 10. AI-assisted development
+
+I used Claude Code (an LLM coding agent) as an engineering collaborator. The main prompt for Part V was:
+
+```
+I have a Java 17 AWS Lambda application implementing an Orders API (OrderService, Order,
+CreateOrderRequest, domain exceptions). I want to expose it through Amazon API Gateway twice:
+(A) non-proxy integration with mapping templates and (B) Lambda proxy integration.
+Operations: POST /orders, GET /orders/{id}, GET /orders?customerId=, later DELETE /orders/{id}.
+Keep the application logic independent from AWS-specific classes.
+Before generating code: 1. propose the architecture; 2. identify which existing files change;
+3. identify new classes; 4. explain where HTTP responsibilities (status codes, headers, errors)
+will reside in each variant. Do not implement anything until the architecture has been explained.
+Deploy with the AWS CLI only (no SAM/CDK) and keep the API Gateway configuration in files.
+```
+
+### Critique of the agent's decisions
+
+**1. One Lambda per operation in Architecture A, one Lambda for the whole API in B.**
+- *Why it proposed it:* it is the "natural" fit of each style: non-proxy integrations map one method to one
+  typed function (`RequestHandler<OrderIdInput, Order>`), and proxy integrations push towards a single router.
+- *Do I agree?* Partially. It makes the comparison very clear, but it hides a cost: state is not shared
+  between functions. The deployed API returned **404 for an order it had just created**
+  ([29](evidence/screenshots/29-mapping-get-created.png)). The agent did not flag this up front; I found it
+  in the evidence.
+- *Alternative:* a single non-proxy function that dispatches on an `"operation"` field set by the mapping
+  template, or (the real fix) external storage such as DynamoDB, which makes function granularity irrelevant
+  for state.
+- *What I implemented:* kept the agent's split, because the workshop says in-memory data is not persistent
+  anyway, and documented the finding as an argument about where state must live.
+
+**2. Encoding the error code in the exception message (`"ORDER_NOT_FOUND: Order X does not exist"`).**
+- *Why it proposed it:* in a non-proxy integration API Gateway can only see `errorMessage`; a stable prefix
+  is the simplest thing a selection regex can match.
+- *Do I agree?* It works, but it makes the domain layer obey a convention that only exists because of API
+  Gateway, and it turns a refactor of a message into a production bug that no unit test of the service
+  would catch. (The agent did add handler tests that assert the messages match the gateway regexes, which
+  reduces the risk.)
+- *Alternative:* keep domain messages free and let the direct handlers catch domain exceptions and rethrow an
+  infrastructure exception (`ApiError("404", ...)`) whose message is the integration contract; or return an
+  explicit result object.
+- *What I implemented:* the prefix, plus `getDescription()` so the proxy adapter can send the message without
+  the code. For a real system I would choose the wrapping alternative or simply Architecture B.
+
+**3. Where validation lives.**
+- *Why it proposed it:* business rules (required fields, `quantity >= 1`) in `OrderService` so both
+  architectures and the tests share them; in A, an additional API Gateway JSON-Schema model that checks types
+  only.
+- *Do I agree?* Yes with the main decision. I questioned the gateway model: it duplicates part of the contract.
+  The agent's argument was that the model avoids invoking Lambda for structurally wrong bodies and that it
+  deliberately does **not** repeat business rules (`required`, `minimum`) to avoid two sources of truth.
+- *Alternative:* full JSON Schema in API Gateway (rules duplicated, but rejected earlier), or no model at all
+  (Lambda's serializer fails with a generic `RuntimeException` that A would map to 500 — wrong status).
+- *What I implemented:* types-only model in A; JSON parsing errors mapped to 400 in B's adapter; rules in Java.
+
+**4. Using `aws-lambda-java-events` types in the adapter, and putting everything in one Maven module.**
+- *Why it proposed it:* typed event/response classes are the documented way, and one module keeps the
+  workshop small.
+- *Do I agree?* For the adapter, yes. But the single module means `aws-lambda-java-core` is on the classpath of
+  the application packages; nothing *prevents* `OrderService` from importing AWS classes — independence is
+  kept by discipline, not by the build.
+- *Alternative:* two modules (`orders-core` with no AWS dependency, `orders-lambda` depending on it), or an
+  ArchUnit test forbidding `com.amazonaws` imports in `domain`/`application`.
+- *What I implemented:* the single module (as the workshop structure suggests), documenting the trade-off.
+
+**5. Routing in B with a `switch` on `httpMethod + " " + resource`.** The agent chose `resource` (the template,
+`/orders/{id}`) instead of parsing `path`, which avoids writing a path matcher — a good decision that I kept.
+For 30 routes I would replace the `switch` with a route table.
+
+---
+
+## 11. Final API and unexpected errors
+
+| Method & URL | Success | Errors |
+|--------------|---------|--------|
+| `POST /orders` | 201 + `Location` | 400, 500 |
+| `GET /orders/{id}` | 200 | 404, 500 |
+| `GET /orders?customerId={customerId}` | 200 (array, possibly empty) | 400, 500 |
+| `DELETE /orders/{id}` | 204 | 404, 500 |
+
+**Unexpected internal error.**
+- B: any `RuntimeException` not mapped to a domain error is caught in the adapter and becomes
+  `500 {"error":"INTERNAL_ERROR","message":"Unexpected error"}`; the exception is written to the Lambda
+  log (CloudWatch) and never to the client. Verified locally by
+  `ApiGatewayProxyHandlerTest.unexpectedFailureIs500WithoutInternalDetails` (a repository that throws). If the
+  function itself crashes or times out, API Gateway returns 502 and the `DEFAULT_5XX` gateway response keeps
+  the same error format.
+- A: any `errorMessage` not starting with a known code (including `Task timed out`) matches the
+  negative-lookahead regex → `500 INTERNAL_ERROR`; the Lambda's `stackTrace` is dropped by the template.
+
+---
+
+## 12. Final architecture
+
+```mermaid
+flowchart TB
+    C["Client<br/>(curl / Postman)"]
+
+    subgraph AWS["AWS — depends on AWS"]
+        subgraph GWA["API Gateway REST API — orders-api-mapping (Architecture A)"]
+            GA["routing · {id} / customerId extraction · VTL request templates<br/>body validation · regex → 200/201/204/400/404/500 · error templates"]
+        end
+        subgraph GWB["API Gateway REST API — orders-api-proxy (Architecture B)"]
+            GB["routing only<br/>(aws_proxy integration)"]
+        end
+        subgraph LA["Lambda: orders-create/get/find/delete-direct"]
+            HA["Direct handlers<br/>CreateOrderHandler, GetOrderHandler,<br/>FindOrdersByCustomerHandler, DeleteOrderHandler"]
+        end
+        subgraph LB["Lambda: orders-proxy"]
+            HB["HTTP adapter<br/>ApiGatewayProxyHandler + HttpResponses<br/>(routing, params, JSON, status codes, headers)"]
+        end
+    end
+
+    subgraph APP["Application logic — ordinary Java (no AWS, no HTTP)"]
+        S["OrderService"]
+        D["Order · CreateOrderRequest<br/>OrderNotFoundException · InvalidOrderException"]
+        R[("OrderRepository →<br/>InMemoryOrderRepository")]
+    end
+
+    C -- "HTTPS request" --> GA
+    C -- "HTTPS request" --> GB
+    GA -- "small JSON {id} / {customerId} / body" --> HA
+    GB -- "full proxy event" --> HB
+    HA -- "method call" --> S
+    HB -- "method call" --> S
+    S --> D
+    S --> R
+    HA -. "Order or exception → errorMessage" .-> GA
+    HB -. "{statusCode, headers, body}" .-> GB
+    GA -. "HTTP response" .-> C
+    GB -. "HTTP response" .-> C
+```
+
+Solid arrows are requests; dotted arrows are responses. Everything inside **AWS** depends on AWS (API Gateway
+configuration, Lambda handlers using `aws-lambda-java-core`/`-events`). Everything inside **Application logic**
+is plain Java and is tested without AWS.
+
+---
+
+## 13. How to build, test and deploy
+
+Requirements: JDK 17+, Maven 3.9+, AWS CLI v2, Git Bash (on Windows) and an IAM identity with the
+permissions in [`deploy/iam-deployer-policy.json`](deploy/iam-deployer-policy.json).
+
+```bash
+mvn test                      # 38 unit tests, no AWS needed
+mvn package                   # target/orders-api-1.0.0.jar (shaded, ready for Lambda)
+./deploy/deploy.sh            # IAM role + 5 Lambda functions + 2 REST APIs; writes deploy/outputs.env
+source deploy/outputs.env     # MAPPING_URL and PROXY_URL
+curl -i "$PROXY_URL/orders/ORD-42"
+./evidence/tools/run-aws-evidence.sh   # optional: re-deploys and regenerates all the evidence
+./deploy/teardown.sh          # delete everything
+```
+
+With an AWS Academy Learner Lab (where roles cannot be created):
+`LAMBDA_ROLE_ARN=arn:aws:iam::<account>:role/LabRole ./deploy/deploy.sh`.
+
+Repository layout:
+
+```
+├── pom.xml
+├── src/main/java/edu/eci/arem/orders/
+│   ├── domain/          Order, CreateOrderRequest, exceptions            (plain Java)
+│   ├── application/     OrderService, OrderRepository, InMemory...      (plain Java)
+│   └── lambda/
+│       ├── OrderServiceProvider.java                                     (composition root)
+│       ├── direct/      handlers for Architecture A                      (AWS)
+│       └── proxy/       ApiGatewayProxyHandler, HttpResponses (B)        (AWS)
+├── src/test/java/...    OrderServiceTest, DirectHandlersTest, ApiGatewayProxyHandlerTest
+├── apigateway/          OpenAPI definitions of both APIs (+ exported/ from AWS)
+├── deploy/              deploy.sh, teardown.sh, config.sh, IAM policies
+├── events/              direct invocation payloads and a real proxy event
+└── evidence/            captured command output (.txt) and screenshots/ (.png)
+```
+
+---
+
+## 14. Evidence and demonstration
+
+Every screenshot in [`evidence/screenshots/`](evidence/screenshots) was produced from the real output of
+the command, which is saved next to it as `.txt` in [`evidence/`](evidence). The commands were run on Windows 11
+(Git Bash in Windows Terminal) against the deployed account in `us-east-1`. Main ones:
+
+| Step | Screenshot |
+|------|-----------|
+| `mvn test` | [01](evidence/screenshots/01-mvn-test.png) |
+| `mvn package` | [02](evidence/screenshots/02-mvn-package.png) |
+| Deploy | [10](evidence/screenshots/10-deploy.png) |
+| Direct Lambda invocation | [11](evidence/screenshots/11-lambda-create-1.png) |
+| Mapping template in action | [20](evidence/screenshots/20-mapping-test-invoke.png) |
+| POST 201 / GET 200 / 404 / 400 / DELETE 204 (proxy) | [41](evidence/screenshots/41-proxy-post-201.png) · [43](evidence/screenshots/43-proxy-get-200.png) · [44](evidence/screenshots/44-proxy-get-404.png) · [48](evidence/screenshots/48-proxy-post-400.png) · [50](evidence/screenshots/50-proxy-delete-204.png) |
+| Deployed resources | [60](evidence/screenshots/60-lambda-functions.png) · [61](evidence/screenshots/61-rest-apis.png) |
+
+**Video:** _link pending_
