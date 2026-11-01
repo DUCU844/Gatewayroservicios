@@ -19,6 +19,9 @@ inv 12-lambda-create-2      "Part II - direct Lambda invoke: create order (input
 inv 13-lambda-create-invalid "Part II - direct Lambda invoke: invalid input -> Lambda error" orders-create-direct events/direct/create-order-invalid.json
 inv 14-lambda-get           "Part II - direct Lambda invoke: get order"                      orders-get-direct    events/direct/get-order.json
 inv 15-lambda-get-missing   "Part II - direct Lambda invoke: missing order -> Lambda error"  orders-get-direct    events/direct/get-order-missing.json
+inv 17-lambda-extra-fields  "Part II - serialization experiment: unknown fields, client id, quantity as string" orders-create-direct events/direct/create-order-extra-fields.json
+inv 18-lambda-case          "Part II - serialization experiment: property names in other case" orders-create-direct events/direct/create-order-case.json
+inv 19-lambda-not-object    "Part II - serialization experiment: JSON that is not an object"  orders-create-direct events/direct/create-order-not-object.json
 inv 16-lambda-find          "Part II - direct Lambda invoke: orders of a customer (List<Order> -> JSON array)" orders-find-direct events/direct/find-by-customer.json
 
 # ------------------------------------------------------------------ Architecture A: what API Gateway sends to Lambda
@@ -43,7 +46,7 @@ cu 25-mapping-query-400      "Arch A - GET /orders (no customerId) -> 400"      
 cu 26-mapping-post-201       "Arch A - POST /orders -> 201 + Location"            "-X POST $J -d @events/direct/create-order-1.json $MAPPING_URL/orders"
 cu 27-mapping-post-400       "Arch A - POST /orders quantity 0 -> 400 (business rule, Java)" "-X POST $J -d @events/direct/create-order-invalid.json $MAPPING_URL/orders"
 cu 28-mapping-post-malformed "Arch A - POST /orders quantity of wrong type -> 400 (API Gateway body validator, Lambda never invoked)" "-X POST $J -d '{\"customerId\": \"CUST-42\", \"quantity\": \"one\"}' $MAPPING_URL/orders"
-created_id() { grep -o '"id" *: *"[^"]*"' "evidence/$1.txt" | head -1 | sed -E 's/.*"([^"]*)"$//'; }
+created_id() { grep -o '"id" *: *"[^"]*"' "evidence/$1.txt" | head -1 | sed -E 's/.*"([^"]*)"$/\1/'; }
 A_ID=$(created_id 26-mapping-post-201)
 cu 29-mapping-get-created    "Arch A - GET $A_ID just created by ANOTHER Lambda -> 404 (in-memory state is per function)" "$MAPPING_URL/orders/$A_ID"
 cu 30-mapping-delete-204     "Arch A - DELETE /orders/ORD-42 -> 204"              "-X DELETE $MAPPING_URL/orders/ORD-42"
