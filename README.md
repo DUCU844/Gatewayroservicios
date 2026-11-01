@@ -149,3 +149,31 @@ List<Order> getOrdersByCustomer(String customerId);
    packages) plus Maven metadata (`META-INF/MANIFEST.MF`, `pom.xml`, `pom.properties`) — ~17 KB, no
    third-party libraries.
 5. **Which parts currently know about HTTP?** None. Not a single class imports anything HTTP related.
+
+---
+
+## 9. Final challenge — `DELETE /orders/{id}`
+
+### Prediction (written and committed *before* implementing the feature)
+
+1. **Which Java classes should change?**
+   `OrderRepository` (+`deleteById`), `InMemoryOrderRepository`, `OrderService` (+`deleteOrder(String id)`),
+   `ApiGatewayProxyHandler` (new route `DELETE /orders/{id}`) and, for Architecture A, a new
+   `DeleteOrderHandler`. `Order`, `CreateOrderRequest` and the exceptions should **not** change:
+   `OrderNotFoundException` already expresses "it does not exist".
+2. **Do you need a new Lambda function?**
+   Architecture B: **no** — the single proxy function already serves the whole API; only a new route in the
+   adapter. Architecture A: **yes** (`orders-delete-direct`), because A was designed one-function-per-operation.
+3. **Does API Gateway configuration need to change?**
+   Yes, in both. A: new method with request template, and integration responses for 204 / 404 / 500.
+   B: only a new `DELETE` method on `/orders/{id}` pointing to the same proxy function (it would need no change
+   at all if the resource had used `ANY` or `{proxy+}`).
+4. **Where should the deletion logic reside?** In `OrderService.deleteOrder` (+ the repository). It is
+   application logic: "an order can be deleted only if it exists".
+5. **Where should the decision to return 204 or 404 reside?** Not in the service — it only returns normally
+   or throws `OrderNotFoundException`. B: in the HTTP adapter (`ApiGatewayProxyHandler`). A: in API Gateway
+   integration responses (default → 204, regex `ORDER_NOT_FOUND:.*` → 404).
+6. **Which tests should be added?** Service: delete an existing order; deleted order is no longer retrievable
+   nor listed for its customer; delete a missing order throws; deleting twice → second time throws.
+   Adapter: `DELETE` existing → 204 with empty body; `DELETE` missing → 404 with the error body.
+   Direct handler: delegates and propagates the `ORDER_NOT_FOUND:` message.
