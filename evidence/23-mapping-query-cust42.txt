@@ -1,0 +1,13 @@
+# Arch A - GET /orders?customerId=CUST-42 -> 200
+# 2026-11-01 11:41:08 -0500
+$ curl -s -i 'https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders?customerId=CUST-42'; echo
+HTTP/1.1 200 OK
+Date: Sun, 01 Nov 2026 16:41:06 GMT
+Content-Type: application/json
+Content-Length: 153
+Connection: keep-alive
+x-amzn-RequestId: 4e09a7c7-7885-47ad-a8ca-2138d112f9d5
+x-amz-apigw-id: GK3BdFI2IAMEVtg=
+X-Amzn-Trace-Id: Root=1-6ae76ba2-7b108e96395dbbcf25cf79d5;Parent=6476d1757b1fb9af;Sampled=0;Lineage=1:67f56555:0
+
+[{"id":"ORD-001","customerId":"CUST-42","product":"MacBook Air","quantity":1},{"id":"ORD-002","customerId":"CUST-42","product":"USB-C Hub","quantity":2}]

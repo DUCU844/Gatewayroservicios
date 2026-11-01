@@ -1,0 +1,17 @@
+# Arch A - GET /orders/ORD-999 -> 404
+# 2026-11-01 11:41:07 -0500
+$ curl -s -i https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-999; echo
+HTTP/1.1 404 Not Found
+Date: Sun, 01 Nov 2026 16:41:05 GMT
+Content-Type: application/json
+Content-Length: 78
+Connection: keep-alive
+x-amzn-RequestId: bfac6a1a-7050-4ca8-ac11-32681fe93f39
+x-amz-apigw-id: GK3BTGa6oAMEUAg=
+X-Amzn-Trace-Id: Root=1-6ae76ba1-064013524424880462330932;Parent=16751a515fb4fdd7;Sampled=0;Lineage=1:e327e056:0
+
+{
+  "error": "ORDER_NOT_FOUND",
+  "message": "Order ORD-999 does not exist"
+}
+

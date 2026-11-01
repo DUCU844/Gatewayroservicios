@@ -1,0 +1,17 @@
+# Arch A - POST /orders quantity 0 -> 400 (business rule, Java)
+# 2026-11-01 11:41:12 -0500
+$ curl -s -i -X POST -H "Content-Type: application/json" -d @events/direct/create-order-invalid.json https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders; echo
+HTTP/1.1 400 Bad Request
+Date: Sun, 01 Nov 2026 16:41:10 GMT
+Content-Type: application/json
+Content-Length: 75
+Connection: keep-alive
+x-amzn-RequestId: 8e1c3a25-4648-42b6-b2c1-1b34968644c2
+x-amz-apigw-id: GK3CJGr9IAMEpUg=
+X-Amzn-Trace-Id: Root=1-6ae76ba6-60a153f24cbc336f192e9f6e;Parent=5fc4f491620c9a8b;Sampled=0;Lineage=1:d21fb35a:0
+
+{
+  "error": "INVALID_ORDER",
+  "message": "quantity must be at least 1"
+}
+

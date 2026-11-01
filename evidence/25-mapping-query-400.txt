@@ -1,0 +1,17 @@
+# Arch A - GET /orders (no customerId) -> 400
+# 2026-11-01 11:41:10 -0500
+$ curl -s -i https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders; echo
+HTTP/1.1 400 Bad Request
+Date: Sun, 01 Nov 2026 16:41:08 GMT
+Content-Type: application/json
+Content-Length: 92
+Connection: keep-alive
+x-amzn-RequestId: 4479b4a2-f7bc-4e78-94cc-61f9cfbe0166
+x-amz-apigw-id: GK3BzEqwIAMEKAw=
+X-Amzn-Trace-Id: Root=1-6ae76ba4-76cd3cad48e0e56029cf91ce;Parent=01319d2196569a68;Sampled=0;Lineage=1:67f56555:0
+
+{
+  "error": "MISSING_CUSTOMER_ID",
+  "message": "query parameter customerId is required"
+}
+

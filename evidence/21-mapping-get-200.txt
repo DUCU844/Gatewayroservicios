@@ -1,0 +1,13 @@
+# Arch A - GET /orders/ORD-42 -> 200
+# 2026-11-01 11:41:05 -0500
+$ curl -s -i https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-42; echo
+HTTP/1.1 200 OK
+Date: Sun, 01 Nov 2026 16:41:04 GMT
+Content-Type: application/json
+Content-Length: 71
+Connection: keep-alive
+x-amzn-RequestId: e5ba7e30-b385-4f70-b183-1db2ff94ce9b
+x-amz-apigw-id: GK3BJHSWoAMEWzA=
+X-Amzn-Trace-Id: Root=1-6ae76ba0-6867c2a11d9b8d3330f624df;Parent=43893f0aadc409d9;Sampled=0;Lineage=1:e327e056:0
+
+{"id":"ORD-42","customerId":"CUST-7","product":"Keyboard","quantity":2}

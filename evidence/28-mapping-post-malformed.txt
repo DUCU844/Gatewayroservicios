@@ -1,0 +1,13 @@
+# Arch A - POST /orders quantity of wrong type -> 400 (API Gateway body validator, Lambda never invoked)
+# 2026-11-01 11:41:14 -0500
+$ curl -s -i -X POST -H "Content-Type: application/json" -d '{"customerId": "CUST-42", "quantity": "one"}' https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders; echo
+HTTP/1.1 400 Bad Request
+Date: Sun, 01 Nov 2026 16:41:12 GMT
+Content-Type: application/json
+Content-Length: 100
+Connection: keep-alive
+x-amzn-RequestId: 7237f541-2da9-42ec-b7dd-ad75445c8e86
+x-amzn-ErrorType: BadRequestException
+x-amz-apigw-id: GK3CWFIioAMEuqg=
+
+{"error":"INVALID_ORDER","message":"Request body is not valid JSON or has fields of the wrong type"}

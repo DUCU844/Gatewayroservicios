@@ -1,0 +1,13 @@
+# Arch A - GET /orders?customerId=CUST-100 -> 200 []
+# 2026-11-01 11:41:09 -0500
+$ curl -s -i 'https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders?customerId=CUST-100'; echo
+HTTP/1.1 200 OK
+Date: Sun, 01 Nov 2026 16:41:07 GMT
+Content-Type: application/json
+Content-Length: 2
+Connection: keep-alive
+x-amzn-RequestId: 252b5a78-97fa-405e-a829-5fc3d9c7e98e
+x-amz-apigw-id: GK3BoEEZIAMES6Q=
+X-Amzn-Trace-Id: Root=1-6ae76ba3-08d43f097300b57140be090e;Parent=3815dbeaef184efe;Sampled=0;Lineage=1:67f56555:0
+
+[]

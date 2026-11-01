@@ -1,0 +1,17 @@
+# Arch A - GET ORD-46 just created by ANOTHER Lambda -> 404 (in-memory state is per function)
+# 2026-11-01 11:41:15 -0500
+$ curl -s -i https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-46; echo
+HTTP/1.1 404 Not Found
+Date: Sun, 01 Nov 2026 16:41:13 GMT
+Content-Type: application/json
+Content-Length: 77
+Connection: keep-alive
+x-amzn-RequestId: d1d86d63-4659-4803-b91f-f82462bb508d
+x-amz-apigw-id: GK3CiHF4IAMEYyw=
+X-Amzn-Trace-Id: Root=1-6ae76ba9-3d8673116f981a475cc1450a;Parent=7dec0f554bec9345;Sampled=0;Lineage=1:e327e056:0
+
+{
+  "error": "ORDER_NOT_FOUND",
+  "message": "Order ORD-46 does not exist"
+}
+

@@ -1,0 +1,17 @@
+# Arch A - DELETE /orders/ORD-999 -> 404
+# 2026-11-01 11:41:18 -0500
+$ curl -s -i -X DELETE https://53zqfs5myi.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-999; echo
+HTTP/1.1 404 Not Found
+Date: Sun, 01 Nov 2026 16:41:16 GMT
+Content-Type: application/json
+Content-Length: 78
+Connection: keep-alive
+x-amzn-RequestId: e083a5de-26b8-4b89-9255-b5bd5c57f9e9
+x-amz-apigw-id: GK3C_HhsIAMEkkQ=
+X-Amzn-Trace-Id: Root=1-6ae76bac-2a6235d65931da3b5b967576;Parent=6fae9a2938587da9;Sampled=0;Lineage=1:82b3a014:0
+
+{
+  "error": "ORDER_NOT_FOUND",
+  "message": "Order ORD-999 does not exist"
+}
+

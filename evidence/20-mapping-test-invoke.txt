@@ -1,0 +1,15 @@
+# Arch A - API Gateway test-invoke GET /orders/{id}: request after mapping template
+# 2026-11-01 11:42:30 -0500
+$ MSYS_NO_PATHCONV=1 aws apigateway test-invoke-method --rest-api-id 53zqfs5myi --resource-id 9nv0i8 --http-method GET --path-with-query-string /orders/ORD-42 --query log --output text | sed 's/^.* UTC [0-9]* : //' | awk '/^Method request path/ || /^Endpoint request body after transformations/,/^Sending request/ {print} /^Endpoint response body before/ || /^Method response body after/ || /^Successfully completed/ {print}' | grep -v -e '^Sending request' -e '^Endpoint request headers'
+Method request path: {id=ORD-42}
+Method request query string: {}
+Method request headers: {}
+Method request body before transformations: 
+Endpoint request URI: https://lambda.us-east-1.amazonaws.com/2015-03-31/functions/arn:aws:lambda:us-east-1:416384710474:function:orders-get-direct/invocations
+Endpoint request body after transformations: {
+  "id": "ORD-42"
+}
+
+Endpoint response body before transformations: {"id":"ORD-42","customerId":"CUST-7","product":"Keyboard","quantity":2}
+Method response body after transformations: {"id":"ORD-42","customerId":"CUST-7","product":"Keyboard","quantity":2}
+Successfully completed execution
