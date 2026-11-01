@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 source deploy/config.sh
 
 echo "== Building $JAR"
-mvn -q -DskipTests package
+env -u MSYS_NO_PATHCONV mvn -q -DskipTests package   # mvn launcher breaks with MSYS_NO_PATHCONV
 
 # ---------------------------------------------------------------- IAM execution role
 if ! ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text 2>/dev/null); then

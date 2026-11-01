@@ -1,0 +1,40 @@
+# Part I - mvn package (shaded JAR for Lambda)
+# 2026-11-01 11:10:32 -0500
+$ mvn -DskipTests package | grep -E 'Building|shade|BUILD|Total' ; ls -l target/*.jar; echo; echo '--- our classes inside the JAR ---'; unzip -l target/orders-api-1.0.0.jar | grep 'edu/eci/arem/orders/.*class'; echo; echo "total: $(unzip -l target/orders-api-1.0.0.jar | tail -1)"
+[INFO] Building orders-api 1.0.0
+[INFO] --- shade:3.5.1:shade (default) @ orders-api ---
+[INFO] Including com.amazonaws:aws-lambda-java-core:jar:1.2.3 in the shaded jar.
+[INFO] Including com.amazonaws:aws-lambda-java-events:jar:3.11.4 in the shaded jar.
+[INFO] Including joda-time:joda-time:jar:2.10.8 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-databind:jar:2.17.2 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-annotations:jar:2.17.2 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-core:jar:2.17.2 in the shaded jar.
+[WARNING] maven-shade-plugin has detected that some files are
+[WARNING] See https://maven.apache.org/plugins/maven-shade-plugin/
+[INFO] Replacing original artifact with shaded artifact.
+[INFO] Replacing C:\Users\adria\Downloads\Gatewayroservicios\target\orders-api-1.0.0.jar with C:\Users\adria\Downloads\Gatewayroservicios\target\orders-api-1.0.0-shaded.jar
+[INFO] BUILD SUCCESS
+[INFO] Total time:  3.588 s
+-rw-r--r-- 1 adria 197609 3401040 Nov  1 11:10 target/orders-api-1.0.0-shaded.jar
+-rw-r--r-- 1 adria 197609 3401040 Nov  1 11:10 target/orders-api-1.0.0.jar
+-rw-r--r-- 1 adria 197609 3401040 Nov  1 11:10 target/original-orders-api-1.0.0.jar
+
+--- our classes inside the JAR ---
+     5236  2026-11-01 11:09   edu/eci/arem/orders/application/InMemoryOrderRepository.class
+      626  2026-11-01 11:09   edu/eci/arem/orders/application/OrderRepository.class
+     4124  2026-11-01 11:09   edu/eci/arem/orders/application/OrderService.class
+     1244  2026-11-01 11:09   edu/eci/arem/orders/domain/CreateOrderRequest.class
+     1359  2026-11-01 11:09   edu/eci/arem/orders/domain/InvalidOrderException.class
+     2566  2026-11-01 11:09   edu/eci/arem/orders/domain/Order.class
+     1215  2026-11-01 11:09   edu/eci/arem/orders/domain/OrderNotFoundException.class
+     1705  2026-11-01 11:09   edu/eci/arem/orders/lambda/direct/CreateOrderHandler.class
+      703  2026-11-01 11:09   edu/eci/arem/orders/lambda/direct/CustomerQueryInput.class
+     1791  2026-11-01 11:09   edu/eci/arem/orders/lambda/direct/DeleteOrderHandler.class
+     2070  2026-11-01 11:09   edu/eci/arem/orders/lambda/direct/FindOrdersByCustomerHandler.class
+     1843  2026-11-01 11:09   edu/eci/arem/orders/lambda/direct/GetOrderHandler.class
+      661  2026-11-01 11:09   edu/eci/arem/orders/lambda/direct/OrderIdInput.class
+      856  2026-11-01 11:09   edu/eci/arem/orders/lambda/OrderServiceProvider.class
+     8057  2026-11-01 11:09   edu/eci/arem/orders/lambda/proxy/ApiGatewayProxyHandler.class
+     3367  2026-11-01 11:09   edu/eci/arem/orders/lambda/proxy/HttpResponses.class
+
+total:   7796100                     2249 files
