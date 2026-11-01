@@ -1,0 +1,12 @@
+# Part II - direct Lambda invoke: missing order -> Lambda error
+# 2026-11-01 11:40:49 -0500
+$ aws lambda invoke --function-name orders-get-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/get-order-missing.json target/out.json; echo '--- payload:'; cat events/direct/get-order-missing.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "FunctionError": "Unhandled",
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{ "id": "ORD-999" }
+--- response:
+{"errorMessage":"ORDER_NOT_FOUND: Order ORD-999 does not exist","errorType":"edu.eci.arem.orders.domain.OrderNotFoundException","stackTrace":["edu.eci.arem.orders.application.OrderService.lambda$getOrder$0(OrderService.java:44)","java.base/java.util.Optional.orElseThrow(Unknown Source)","edu.eci.arem.orders.application.OrderService.getOrder(OrderService.java:44)","edu.eci.arem.orders.lambda.direct.GetOrderHandler.handleRequest(GetOrderHandler.java:24)","java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)","java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)","java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)","java.base/java.lang.reflect.Method.invoke(Unknown Source)"]}

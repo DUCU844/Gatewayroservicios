@@ -1,0 +1,16 @@
+# Part II - serialization experiment: property names in other case
+# 2026-11-01 11:40:54 -0500
+$ aws lambda invoke --function-name orders-create-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/create-order-case.json target/out.json; echo '--- payload:'; cat events/direct/create-order-case.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "FunctionError": "Unhandled",
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{
+  "CustomerID": "CUST-7",
+  "PRODUCT": "Mouse",
+  "quantity": 1
+}
+--- response:
+{"errorMessage":"INVALID_ORDER: customerId is required","errorType":"edu.eci.arem.orders.domain.InvalidOrderException","stackTrace":["edu.eci.arem.orders.application.OrderService.requireText(OrderService.java:66)","edu.eci.arem.orders.application.OrderService.createOrder(OrderService.java:28)","edu.eci.arem.orders.lambda.direct.CreateOrderHandler.handleRequest(CreateOrderHandler.java:32)","java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)","java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)","java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)","java.base/java.lang.reflect.Method.invoke(Unknown Source)"]}

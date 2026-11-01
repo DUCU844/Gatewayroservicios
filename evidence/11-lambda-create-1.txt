@@ -1,0 +1,15 @@
+# Part II - direct Lambda invoke: create order (input 1)
+# 2026-11-01 11:40:40 -0500
+$ aws lambda invoke --function-name orders-create-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/create-order-1.json target/out.json; echo '--- payload:'; cat events/direct/create-order-1.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{
+  "customerId": "CUST-42",
+  "product": "MacBook Air",
+  "quantity": 1
+}
+--- response:
+{"id":"ORD-43","customerId":"CUST-42","product":"MacBook Air","quantity":1}

@@ -1,0 +1,11 @@
+# Part II - direct Lambda invoke: orders of a customer (List<Order> -> JSON array)
+# 2026-11-01 11:40:58 -0500
+$ aws lambda invoke --function-name orders-find-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/find-by-customer.json target/out.json; echo '--- payload:'; cat events/direct/find-by-customer.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{ "customerId": "CUST-42" }
+--- response:
+[{"id":"ORD-001","customerId":"CUST-42","product":"MacBook Air","quantity":1},{"id":"ORD-002","customerId":"CUST-42","product":"USB-C Hub","quantity":2}]

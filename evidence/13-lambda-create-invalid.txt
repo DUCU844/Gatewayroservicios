@@ -1,0 +1,16 @@
+# Part II - direct Lambda invoke: invalid input -> Lambda error
+# 2026-11-01 11:40:44 -0500
+$ aws lambda invoke --function-name orders-create-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/create-order-invalid.json target/out.json; echo '--- payload:'; cat events/direct/create-order-invalid.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "FunctionError": "Unhandled",
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{
+  "customerId": "CUST-42",
+  "product": "MacBook Air",
+  "quantity": 0
+}
+--- response:
+{"errorMessage":"INVALID_ORDER: quantity must be at least 1","errorType":"edu.eci.arem.orders.domain.InvalidOrderException","stackTrace":["edu.eci.arem.orders.application.OrderService.createOrder(OrderService.java:34)","edu.eci.arem.orders.lambda.direct.CreateOrderHandler.handleRequest(CreateOrderHandler.java:32)","java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)","java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)","java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)","java.base/java.lang.reflect.Method.invoke(Unknown Source)"]}

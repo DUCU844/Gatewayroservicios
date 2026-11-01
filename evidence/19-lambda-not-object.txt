@@ -1,0 +1,12 @@
+# Part II - serialization experiment: JSON that is not an object
+# 2026-11-01 11:40:56 -0500
+$ aws lambda invoke --function-name orders-create-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/create-order-not-object.json target/out.json; echo '--- payload:'; cat events/direct/create-order-not-object.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "FunctionError": "Unhandled",
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+"just a string"
+--- response:
+{"errorMessage":"An error occurred during JSON parsing","errorType":"java.lang.RuntimeException","stackTrace":[]}

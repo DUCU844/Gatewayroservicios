@@ -1,0 +1,17 @@
+# Part II - serialization experiment: unknown fields, client id, quantity as string
+# 2026-11-01 11:40:51 -0500
+$ aws lambda invoke --function-name orders-create-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/create-order-extra-fields.json target/out.json; echo '--- payload:'; cat events/direct/create-order-extra-fields.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{
+  "customerId": "CUST-7",
+  "product": "Mouse",
+  "quantity": "2",
+  "color": "black",
+  "id": "HACKED-1"
+}
+--- response:
+{"id":"ORD-45","customerId":"CUST-7","product":"Mouse","quantity":2}

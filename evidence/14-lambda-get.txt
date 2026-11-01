@@ -1,0 +1,11 @@
+# Part II - direct Lambda invoke: get order
+# 2026-11-01 11:40:46 -0500
+$ aws lambda invoke --function-name orders-get-direct --cli-binary-format raw-in-base64-out --payload file://events/direct/get-order.json target/out.json; echo '--- payload:'; cat events/direct/get-order.json; echo '--- response:'; cat target/out.json; echo
+{
+    "StatusCode": 200,
+    "ExecutedVersion": "$LATEST"
+}
+--- payload:
+{ "id": "ORD-42" }
+--- response:
+{"id":"ORD-42","customerId":"CUST-7","product":"Keyboard","quantity":2}
