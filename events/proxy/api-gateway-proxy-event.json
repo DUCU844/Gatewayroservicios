@@ -1,0 +1,57 @@
+{
+  "resource": "/orders",
+  "path": "/orders",
+  "httpMethod": "GET",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "multiValueHeaders": {
+    "Accept": [
+      "application/json"
+    ]
+  },
+  "queryStringParameters": {
+    "customerId": "CUST-42"
+  },
+  "multiValueQueryStringParameters": {
+    "customerId": [
+      "CUST-42"
+    ]
+  },
+  "pathParameters": null,
+  "stageVariables": null,
+  "requestContext": {
+    "resourceId": "42i5rt",
+    "resourcePath": "/orders",
+    "httpMethod": "GET",
+    "extendedRequestId": "GK3D0EREoAMFaTw=",
+    "requestTime": "01/Nov/2026:16:41:21 +0000",
+    "path": "/orders",
+    "accountId": "416384710474",
+    "protocol": "HTTP/1.1",
+    "stage": "test-invoke-stage",
+    "domainPrefix": "testPrefix",
+    "requestTimeEpoch": 1793551281573,
+    "requestId": "979f9318-917b-42cb-82d9-137eecbc2c45",
+    "identity": {
+      "cognitoIdentityPoolId": null,
+      "cognitoIdentityId": null,
+      "apiKey": "test-invoke-api-key",
+      "principalOrgId": null,
+      "cognitoAuthenticationType": null,
+      "userArn": "REDACTED",
+      "apiKeyId": "test-invoke-api-key-id",
+      "userAgent": "aws-cli/2.0.30 Python/3.7.7 Windows/10 botocore/2.0.0dev34",
+      "accountId": "416384710474",
+      "caller": "REDACTED",
+      "sourceIp": "test-invoke-source-ip",
+      "accessKey": "REDACTED",
+      "cognitoAuthenticationProvider": null,
+      "user": "REDACTED"
+    },
+    "domainName": "testPrefix.testDomainName",
+    "apiId": "qdkefe66a7"
+  },
+  "body": null,
+  "isBase64Encoded": false
+}

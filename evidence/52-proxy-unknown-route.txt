@@ -1,0 +1,13 @@
+# Arch B - unknown route -> 404
+# 2026-11-01 11:41:40 -0500
+$ curl -s -i https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod/customers; echo
+HTTP/1.1 404 Not Found
+Date: Sun, 01 Nov 2026 16:41:38 GMT
+Content-Type: application/json
+Content-Length: 72
+Connection: keep-alive
+x-amzn-RequestId: 82cdf77a-3ef9-47c9-8b5d-2312faef665a
+x-amzn-ErrorType: MissingAuthenticationTokenException
+x-amz-apigw-id: GK3GaFfcIAMEFkA=
+
+{"error":"ROUTE_NOT_FOUND","message":"No route for GET /prod/customers"}

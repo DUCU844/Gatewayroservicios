@@ -1,0 +1,13 @@
+# Arch B - DELETE /orders/ORD-42 -> 204
+# 2026-11-01 11:41:37 -0500
+$ curl -s -i -X DELETE https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-42; echo
+HTTP/1.1 204 No Content
+Date: Sun, 01 Nov 2026 16:41:35 GMT
+Content-Type: application/json
+Content-Length: 0
+Connection: keep-alive
+x-amzn-RequestId: e24e88e6-3ac3-4531-9042-ea34094e8f0f
+x-amz-apigw-id: GK3GBFP-oAMEaZg=
+X-Amzn-Trace-Id: Root=1-6ae76bbf-158cd29a09535bc133fda534;Parent=1984569951b2a20e;Sampled=0;Lineage=1:ea6eb83a:0
+
+

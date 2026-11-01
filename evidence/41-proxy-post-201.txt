@@ -1,0 +1,14 @@
+# Arch B - POST /orders -> 201 + Location
+# 2026-11-01 11:41:27 -0500
+$ curl -s -i -X POST -H "Content-Type: application/json" -d @events/direct/create-order-1.json https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod/orders; echo
+HTTP/1.1 201 Created
+Date: Sun, 01 Nov 2026 16:41:26 GMT
+Content-Type: application/json
+Content-Length: 75
+Connection: keep-alive
+x-amzn-RequestId: 14ff60f1-416d-414e-8045-ce899f0c8c32
+x-amz-apigw-id: GK3EgGd4IAMErsw=
+Location: /orders/ORD-43
+X-Amzn-Trace-Id: Root=1-6ae76bb5-21cee95471f32c1d4f88054a;Parent=11a95af259de7002;Sampled=0;Lineage=1:ea6eb83a:0
+
+{"id":"ORD-43","customerId":"CUST-42","product":"MacBook Air","quantity":1}

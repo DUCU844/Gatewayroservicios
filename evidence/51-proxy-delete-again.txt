@@ -1,0 +1,24 @@
+# Arch B - GET + DELETE /orders/ORD-42 again -> 404
+# 2026-11-01 11:41:38 -0500
+$ curl -s -i https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-42; echo; echo; curl -s -i -X DELETE https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-42; echo
+HTTP/1.1 404 Not Found
+Date: Sun, 01 Nov 2026 16:41:36 GMT
+Content-Type: application/json
+Content-Length: 67
+Connection: keep-alive
+x-amzn-RequestId: 985ebabf-735a-41b7-a280-656447e273f3
+x-amz-apigw-id: GK3GLGA5oAMEe9Q=
+X-Amzn-Trace-Id: Root=1-6ae76bc0-5220d0a003b055ac4dca6096;Parent=477ee9e23a6a8c10;Sampled=0;Lineage=1:ea6eb83a:0
+
+{"error":"ORDER_NOT_FOUND","message":"Order ORD-42 does not exist"}
+
+HTTP/1.1 404 Not Found
+Date: Sun, 01 Nov 2026 16:41:37 GMT
+Content-Type: application/json
+Content-Length: 67
+Connection: keep-alive
+x-amzn-RequestId: ab9bdaf4-6674-4f7b-9127-d3b6c2b0a3d4
+x-amz-apigw-id: GK3GPHlMIAMEERw=
+X-Amzn-Trace-Id: Root=1-6ae76bc1-0543e38715d822e2401cba2f;Parent=06158fa4aaca6978;Sampled=0;Lineage=1:ea6eb83a:0
+
+{"error":"ORDER_NOT_FOUND","message":"Order ORD-42 does not exist"}

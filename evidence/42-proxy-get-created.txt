@@ -1,0 +1,13 @@
+# Arch B - GET ORD-43 just created -> 200 (same Lambda, warm environment)
+# 2026-11-01 11:41:29 -0500
+$ curl -s -i https://qdkefe66a7.execute-api.us-east-1.amazonaws.com/prod/orders/ORD-43; echo
+HTTP/1.1 200 OK
+Date: Sun, 01 Nov 2026 16:41:27 GMT
+Content-Type: application/json
+Content-Length: 75
+Connection: keep-alive
+x-amzn-RequestId: 4918d54d-4b8d-4c7f-a406-e5ebe9b810d9
+x-amz-apigw-id: GK3EvF6FIAMERwg=
+X-Amzn-Trace-Id: Root=1-6ae76bb7-7020bb8d56dd985f03eb10c1;Parent=487e83e4ca984df8;Sampled=0;Lineage=1:ea6eb83a:0
+
+{"id":"ORD-43","customerId":"CUST-42","product":"MacBook Air","quantity":1}
