@@ -41,8 +41,7 @@ deploy_function() {  # name handler
   else
     echo "== Creating function $name"
     aws lambda create-function --function-name "$name" --runtime java17 --role "$ROLE_ARN" \
-      --handler "$handler" --zip-file "fileb://$JAR" --memory-size 512 --timeout 15 \
-      --architectures x86_64 >/dev/null
+      --handler "$handler" --zip-file "fileb://$JAR" --memory-size 512 --timeout 15 >/dev/null
     aws lambda wait function-active --function-name "$name"
   fi
 }

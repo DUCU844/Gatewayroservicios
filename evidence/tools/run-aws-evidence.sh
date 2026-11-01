@@ -30,7 +30,7 @@ PROXY_ID=$(echo "$PROXY_URL" | sed -E 's#https://([^.]+)\..*#\1#')
 res_id() { aws apigateway get-resources --rest-api-id "$1" --query "items[?path=='$2'].id | [0]" --output text; }
 
 $C 20-mapping-test-invoke "Arch A - API Gateway test-invoke GET /orders/{id}: request after mapping template" \
-  "MSYS_NO_PATHCONV=1 aws apigateway test-invoke-method --rest-api-id $MAPPING_ID --resource-id $(res_id "$MAPPING_ID" '/orders/{id}') --http-method GET --path-with-query-string /orders/ORD-42 --query log --output text | grep -E 'Method request path|Endpoint request body after transformations|Endpoint response body before transformations|Method response status|Method response body after transformations'"
+  "MSYS_NO_PATHCONV=1 aws apigateway test-invoke-method --rest-api-id $MAPPING_ID --resource-id $(res_id "$MAPPING_ID" '/orders/{id}') --http-method GET --path-with-query-string /orders/ORD-42 --query log --output text | sed 's/^.* UTC [0-9]* : //' | awk '/^Method request path/ || /^Endpoint request body after transformations/,/^Sending request/ {print} /^Endpoint response body before/ || /^Method response body after/ || /^Successfully completed/ {print}' | grep -v -e '^Sending request' -e '^Endpoint request headers'"
 
 # ------------------------------------------------------------------ Architecture A: HTTP calls
 cu() {  # name title curl-args...
@@ -62,6 +62,10 @@ import json, re
 log = open('target/proxy-test-invoke.log', encoding='utf-8').read()
 m = re.search(r'Endpoint request body after transformations: (\{.*?\})\s*\n\S', log, re.S)
 event = json.loads(m.group(1))
+identity = event.get('requestContext', {}).get('identity', {})
+for key in ('accessKey', 'caller', 'user', 'userArn'):   # never publish credentials / IAM identifiers
+    if identity.get(key):
+        identity[key] = 'REDACTED'
 with open('events/proxy/api-gateway-proxy-event.json', 'w', encoding='utf-8', newline='\n') as f:
     json.dump(event, f, indent=2)
     f.write('\n')
