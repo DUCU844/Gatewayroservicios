@@ -12,6 +12,7 @@ done
 for entry in "${FUNCTIONS[@]}"; do
   aws lambda delete-function --function-name "${entry%%=*}" && echo "deleted function ${entry%%=*}"
 done
+[[ -n "${LAMBDA_ROLE_ARN:-}" ]] && exit 0   # role was not created by deploy.sh
 aws iam detach-role-policy --role-name "$ROLE_NAME" \
   --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 aws iam delete-role --role-name "$ROLE_NAME" && echo "deleted role $ROLE_NAME"

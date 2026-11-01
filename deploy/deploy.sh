@@ -4,6 +4,7 @@
 #
 # Usage:  ./deploy/deploy.sh            (uses the default AWS profile / region)
 #         AWS_PROFILE=lab AWS_REGION=us-east-1 ./deploy/deploy.sh
+#         LAMBDA_ROLE_ARN=arn:aws:iam::<account>:role/LabRole ./deploy/deploy.sh
 set -euo pipefail
 export MSYS_NO_PATHCONV=1   # Git Bash on Windows: do not rewrite "/orders"-like arguments into file paths
 export AWS_PAGER=""
@@ -15,7 +16,11 @@ echo "== Building $JAR"
 env -u MSYS_NO_PATHCONV mvn -q -DskipTests package   # mvn launcher breaks with MSYS_NO_PATHCONV
 
 # ---------------------------------------------------------------- IAM execution role
-if ! ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text 2>/dev/null); then
+# Set LAMBDA_ROLE_ARN to reuse an existing role (e.g. AWS Academy "LabRole", where iam:CreateRole is denied).
+if [[ -n "${LAMBDA_ROLE_ARN:-}" ]]; then
+  ROLE_ARN="$LAMBDA_ROLE_ARN"
+  echo "== Using existing role $ROLE_ARN"
+elif ! ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text 2>/dev/null); then
   echo "== Creating role $ROLE_NAME"
   ROLE_ARN=$(aws iam create-role --role-name "$ROLE_NAME" \
     --assume-role-policy-document file://deploy/lambda-trust-policy.json --query Role.Arn --output text)
