@@ -1,0 +1,183 @@
+# Architecture A - API Gateway REST API with NON-PROXY (custom) Lambda integrations.
+#
+# API Gateway owns: routing, path/query extraction, request transformation (mapping templates),
+# body type validation, status-code selection (Lambda error regex) and error-body transformation.
+#
+# ${REGION}, ${ACCOUNT_ID} and ${FN_PREFIX} are replaced by deploy/deploy.sh before importing.
+swagger: "2.0"
+info:
+  title: orders-api-mapping
+  description: Orders API - Architecture A (API Gateway mapping templates / non-proxy integration)
+  version: "1.0"
+schemes:
+  - https
+produces:
+  - application/json
+
+x-amazon-apigateway-request-validators:
+  body-only:
+    validateRequestBody: true
+    validateRequestParameters: false
+
+# Errors produced by API Gateway itself (before Lambda runs) use the same error format as the application.
+x-amazon-apigateway-gateway-responses:
+  BAD_REQUEST_BODY:
+    statusCode: 400
+    responseTemplates:
+      application/json: '{"error":"INVALID_ORDER","message":"Request body is not valid JSON or has fields of the wrong type"}'
+  UNSUPPORTED_MEDIA_TYPE:
+    statusCode: 415
+    responseTemplates:
+      application/json: '{"error":"UNSUPPORTED_MEDIA_TYPE","message":"Content-Type must be application/json"}'
+  MISSING_AUTHENTICATION_TOKEN:
+    statusCode: 404
+    responseTemplates:
+      application/json: '{"error":"ROUTE_NOT_FOUND","message":"No route for $context.httpMethod $context.path"}'
+  DEFAULT_5XX:
+    responseTemplates:
+      application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'
+
+definitions:
+  CreateOrderRequest:
+    type: object
+    # Only structural typing here. Business rules (required, quantity >= 1) stay in OrderService.
+    properties:
+      customerId: { type: string }
+      product: { type: string }
+      quantity: { type: integer }
+  Order:
+    type: object
+    properties:
+      id: { type: string }
+      customerId: { type: string }
+      product: { type: string }
+      quantity: { type: integer }
+  OrderList:
+    type: array
+    items: { $ref: "#/definitions/Order" }
+  Error:
+    type: object
+    properties:
+      error: { type: string }
+      message: { type: string }
+
+paths:
+  /orders:
+    get:
+      summary: Find the orders of a customer
+      parameters:
+        - { name: customerId, in: query, required: false, type: string }
+      responses:
+        "200": { description: Orders of the customer, schema: { $ref: "#/definitions/OrderList" } }
+        "400": { description: Missing customerId, schema: { $ref: "#/definitions/Error" } }
+        "500": { description: Unexpected error, schema: { $ref: "#/definitions/Error" } }
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-find-direct/invocations
+        passthroughBehavior: when_no_templates
+        requestTemplates:
+          application/json: |
+            {
+              "customerId": "$util.escapeJavaScript($input.params('customerId'))"
+            }
+        responses:
+          default:
+            statusCode: "200"
+          "(?s)(INVALID_ORDER|MISSING_CUSTOMER_ID):.*":
+            statusCode: "400"
+            responseTemplates:
+              application/json: |
+                #set($raw = $input.path('$.errorMessage'))
+                #set($idx = $raw.indexOf(':'))
+                #set($start = $idx + 2)
+                {
+                  "error": "$raw.substring(0, $idx)",
+                  "message": "$util.escapeJavaScript($raw.substring($start))"
+                }
+          "(?s)(?!INVALID_ORDER:|MISSING_CUSTOMER_ID:|ORDER_NOT_FOUND:).+":
+            statusCode: "500"
+            responseTemplates:
+              application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'
+
+    post:
+      summary: Create an order
+      consumes:
+        - application/json
+      parameters:
+        - { name: body, in: body, required: true, schema: { $ref: "#/definitions/CreateOrderRequest" } }
+      x-amazon-apigateway-request-validator: body-only
+      responses:
+        "201":
+          description: Order created
+          schema: { $ref: "#/definitions/Order" }
+          headers:
+            Location: { type: string }
+        "400": { description: Invalid order, schema: { $ref: "#/definitions/Error" } }
+        "500": { description: Unexpected error, schema: { $ref: "#/definitions/Error" } }
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-create-direct/invocations
+        passthroughBehavior: never
+        requestTemplates:
+          application/json: "$input.json('$')"
+        responses:
+          default:
+            statusCode: "201"
+            responseTemplates:
+              application/json: |
+                #set($context.responseOverride.header.Location = "/orders/$input.path('$.id')")
+                $input.json('$')
+          "(?s)(INVALID_ORDER|MISSING_CUSTOMER_ID):.*":
+            statusCode: "400"
+            responseTemplates:
+              application/json: |
+                #set($raw = $input.path('$.errorMessage'))
+                #set($idx = $raw.indexOf(':'))
+                #set($start = $idx + 2)
+                {
+                  "error": "$raw.substring(0, $idx)",
+                  "message": "$util.escapeJavaScript($raw.substring($start))"
+                }
+          "(?s)(?!INVALID_ORDER:|MISSING_CUSTOMER_ID:|ORDER_NOT_FOUND:).+":
+            statusCode: "500"
+            responseTemplates:
+              application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'
+
+  /orders/{id}:
+    get:
+      summary: Retrieve an order
+      parameters:
+        - { name: id, in: path, required: true, type: string }
+      responses:
+        "200": { description: The order, schema: { $ref: "#/definitions/Order" } }
+        "404": { description: Order not found, schema: { $ref: "#/definitions/Error" } }
+        "500": { description: Unexpected error, schema: { $ref: "#/definitions/Error" } }
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri: arn:aws:apigateway:${REGION}:lambda:path/2015-03-31/functions/arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${FN_PREFIX}-get-direct/invocations
+        passthroughBehavior: when_no_templates
+        requestTemplates:
+          application/json: |
+            {
+              "id": "$util.escapeJavaScript($input.params('id'))"
+            }
+        responses:
+          default:
+            statusCode: "200"
+          "(?s)ORDER_NOT_FOUND:.*":
+            statusCode: "404"
+            responseTemplates:
+              application/json: |
+                #set($raw = $input.path('$.errorMessage'))
+                #set($start = $raw.indexOf(':') + 2)
+                {
+                  "error": "ORDER_NOT_FOUND",
+                  "message": "$util.escapeJavaScript($raw.substring($start))"
+                }
+          "(?s)(?!INVALID_ORDER:|MISSING_CUSTOMER_ID:|ORDER_NOT_FOUND:).+":
+            statusCode: "500"
+            responseTemplates:
+              application/json: '{"error":"INTERNAL_ERROR","message":"Unexpected error"}'
